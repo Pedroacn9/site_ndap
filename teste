@@ -1,0 +1,305 @@
+Eu quero que ao fim de a pessoa ter se registado, seja lhe enviado um email para o email que ela pôs no registo:
+
+registar.php:
+
+<?php
+include('conexao.php'); // Certifique-se de que a variável $mysqli está definida aqui.
+
+session_start();
+
+$erro = '';
+
+if (isset($_POST['nome'], $_POST['email'], $_POST['password'], $_POST['confirma_password'])) {
+    if (empty($_POST['nome'])) {
+        $erro = "Preencha o seu nome";
+    } elseif (empty($_POST['email'])) {
+        $erro = "Preencha o seu e-mail";
+    } elseif (empty($_POST['password'])) {
+        $erro = "Preencha a sua password";
+    } elseif (empty($_POST['confirma_password'])) {
+        $erro = "Preencha a confirmação de password";
+    } elseif ($_POST['password'] !== $_POST['confirma_password']) {
+        $erro = "As passwords não coincidem";
+    } else {
+        $nome = $mysqli->real_escape_string($_POST['nome']);
+        $email = $mysqli->real_escape_string($_POST['email']);
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Criptografar a password
+
+        // Verificar se uma foto de perfil foi enviada
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $foto_perfil = $_FILES['foto_perfil'];
+            $caminho_foto = '/site_ndap/ndap/login/Foto de Perfil/' . basename($foto_perfil['name']);
+            if (!move_uploaded_file($foto_perfil['tmp_name'], $_SERVER['DOCUMENT_ROOT'] . $caminho_foto)) {
+                $erro = "Erro ao mover a foto de perfil para o diretório de uploads";
+            }
+        } else {
+            $caminho_foto = null; // Definir como null se nenhuma foto foi enviada
+        }
+
+        if (empty($erro)) {
+            $sql = "INSERT INTO utilizador (nome, email, password, foto_perfil) VALUES (?, ?, ?, ?)";
+            if ($stmt = $mysqli->prepare($sql)) {
+                $stmt->bind_param('ssss', $nome, $email, $password, $caminho_foto);
+
+                if ($stmt->execute()) {
+                    $_SESSION['id'] = $stmt->insert_id;
+                    $_SESSION['nome'] = $nome;
+                    $_SESSION['email'] = $email;
+                    $_SESSION['foto_perfil'] = $caminho_foto; // Definir a foto de perfil na sessão
+
+                    header("Location: index.php");
+                    exit(); // Certifique-se de sair após o redirecionamento
+                } else {
+                    $erro = "Erro ao registar: " . $stmt->error;
+                }
+
+                $stmt->close();
+            } else {
+                $erro = "Erro ao preparar a inserção: " . $mysqli->error;
+            }
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Registrar</title>
+  <link rel='stylesheet' href='https://use.fontawesome.com/releases/v5.2.0/css/all.css'>
+  <link rel='stylesheet' href='https://use.fontawesome.com/releases/v5.2.0/css/fontawesome.css'>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="container">
+    <div class="screen">
+        <div class="screen__content">
+            <form class="login" method="POST" enctype="multipart/form-data">
+                <div class="login__field">
+                    <i class="login__icon fas fa-user"></i>
+                    <input type="text" class="login__input" name="nome" placeholder="Nome">
+                </div>
+                <div class="login__field">
+                    <i class="login__icon fas fa-envelope"></i>
+                    <input type="email" class="login__input" name="email" placeholder="Email">
+                </div>
+                <div class="login__field">
+                    <i class="login__icon fas fa-lock"></i>
+                    <input type="password" class="login__input" name="password" placeholder="Password">
+                </div>
+                <div class="login__field">
+                    <i class="login__icon fas fa-lock"></i>
+                    <input type="password" class="login__input" name="confirma_password" placeholder="Confirmar Password">
+                </div>
+                <div class="login__field">
+                    <i class="login__icon fas fa-image"></i>
+                    <input type="file" class="login__input" name="foto_perfil" accept="image/*">
+                    <p style="font-size: 12px;">Se quiser Foto de Perfil:</p>
+                </div>
+                <button class="button login__submit" type="submit">
+                    <span class="button__text">Registrar</span>
+                    <i class="button__icon fas fa-chevron-right"></i>
+                </button>
+                <?php if (!empty($erro)):?>
+                    <p style="color: red;"><?php echo $erro;?></p>
+                <?php endif;?>             
+            </form>
+            <div class="social-login">
+                <h3>Já tem uma conta?</h3>
+                <a href="/site_ndap/ndap/login/index.php">
+                    <h6>Login Aqui</h6>
+                </a>
+            </div>
+        </div>
+        <div class="screen__background">
+            <span class="screen__background__shape screen__background__shape4"></span>
+            <span class="screen__background__shape screen__background__shape3"></span>       
+            <span class="screen__background__shape screen__background__shape2"></span>
+            <span class="screen__background__shape screen__background__shape1"></span>
+        </div>      
+    </div>
+</div>
+</body>
+</html>
+
+funcoes.php:
+
+<?php
+include('conexao.php');
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\SMTP;
+
+require 'PHPMailer/src/Exception.php';
+require 'PHPMailer/src/PHPMailer.php';
+require 'PHPMailer/src/SMTP.php';
+
+function envia_email($destino) {
+    global $mysqli; // Usa a conexão definida no conexao.php
+
+    $mail = new PHPMailer(true);
+    
+    try {
+        $mail->isSMTP();
+        $mail->Mailer = "smtp";
+        $mail->SMTPDebug  = SMTP::DEBUG_OFF; // Defina como DEBUG_OFF em produção
+        $mail->SMTPAuth   = true;
+        $mail->SMTPSecure = "tls";
+        $mail->Port       = 587;
+        $mail->Host       = "smtp.gmail.com";
+        $mail->Username   = "ppetersoft@gmail.com";
+        $mail->Password   = "glmf cmbd yknf dtba";
+
+        $mail->isHTML(true);
+        $mail->addAddress($destino, "Utilizador");
+        $mail->setFrom("ppetersoft@gmail.com", "NDAP");
+        $mail->Subject = "Recuperacao de Senha";
+
+        // Gera o token e define expiração
+        $token = bin2hex(random_bytes(16));
+        $expiracao = date("Y-m-d H:i:s", strtotime("+1 hour"));
+
+        // Atualiza no banco de dados
+        $stmt = $mysqli->prepare("UPDATE utilizador SET token_redefinicao = ?, token_expiracao = ? WHERE email = ?");
+        $stmt->bind_param("sss", $token, $expiracao, $destino);
+
+        if ($stmt->execute()) {
+            $content = "<b>Clique no <a href='http://localhost/site_ndap/ndap/login/definir_password.php?token=$token'>Redefinir Senha</a> para redefinir sua senha. Este link expira em 1 hora.</b>";
+        } else {
+            throw new Exception("Erro ao atualizar o banco de dados.");
+        }
+
+        $mail->Body = $content;
+
+        // Configurações de segurança do TLS
+        $mail->SMTPOptions = array(
+            'ssl' => array(
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            )
+        );
+
+        $mail->send();
+
+        echo "E-mail enviado com sucesso.";
+    } catch (Exception $e) {
+        echo "Erro ao enviar e-mail: {$mail->ErrorInfo}";
+    }
+}
+?>
+
+confirmar_email.php:
+
+<?php
+include('conexao.php'); // Certifique-se de que a variável $mysqli está definida aqui.
+
+if (isset($_GET['token'])) {
+    $token = $mysqli->real_escape_string($_GET['token']);
+
+    $stmt = $mysqli->prepare("SELECT id_utilizador FROM utilizador WHERE token_confirmacao = ? AND email_confirmado = 0");
+    $stmt->bind_param("s", $token);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 1) {
+        $user = $result->fetch_assoc();
+        $stmt_update = $mysqli->prepare("UPDATE utilizador SET email_confirmado = 1, token_confirmacao = NULL WHERE id_utilizador = ?");
+        $stmt_update->bind_param("i", $user['id_utilizador']);
+
+        if ($stmt_update->execute()) {
+            echo "<h1>E-mail confirmado com sucesso!</h1>";
+            echo "<p>Agora você pode <a href='/site_ndap/ndap/login/index.php'>fazer login</a>.</p>";
+        } else {
+            echo "<h1>Erro ao confirmar o e-mail.</h1>";
+        }
+    } else {
+        echo "<h1>Token inválido ou e-mail já confirmado.</h1>";
+    }
+} else {
+    echo "<h1>Token não fornecido.</h1>";
+}
+?>
+
+tabela do mysql "utilizador":
+
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Tempo de geração: 08-Jan-2025 às 21:56
+-- Versão do servidor: 10.4.32-MariaDB
+-- versão do PHP: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Banco de dados: `ndap`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura da tabela `utilizador`
+--
+
+CREATE TABLE `utilizador` (
+  `id_utilizador` int(11) NOT NULL,
+  `nome` varchar(100) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `password` varchar(255) NOT NULL,
+  `foto_perfil` varchar(255) DEFAULT NULL,
+  `data_de_registo` date DEFAULT NULL,
+  `tipo` varchar(50) DEFAULT NULL,
+  `token_redefinicao` varchar(255) DEFAULT NULL,
+  `token_expiracao` datetime DEFAULT NULL,
+  `confirma_password` varchar(255) DEFAULT NULL,
+  `email_confirmado` tinyint(1) DEFAULT 0,
+  `token_confirmacao` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Extraindo dados da tabela `utilizador`
+--
+
+INSERT INTO `utilizador` (`id_utilizador`, `nome`, `email`, `password`, `foto_perfil`, `data_de_registo`, `tipo`, `token_redefinicao`, `token_expiracao`, `confirma_password`, `email_confirmado`, `token_confirmacao`) VALUES
+(18, 'pedro', 'pedroacn9@gmail.com', '$2y$10$EohIuv7y2eoyA5U6RmM2zudWlN./o1fB8xiYQzD2G4B.fOERuQDTa', '/site_ndap/ndap/login/Foto de Perfil/Captura de ecrã 2024-04-18 151031.png', NULL, NULL, NULL, NULL, NULL, 0, NULL);
+
+--
+-- Índices para tabelas despejadas
+--
+
+--
+-- Índices para tabela `utilizador`
+--
+ALTER TABLE `utilizador`
+  ADD PRIMARY KEY (`id_utilizador`),
+  ADD UNIQUE KEY `unique_email` (`email`);
+
+--
+-- AUTO_INCREMENT de tabelas despejadas
+--
+
+--
+-- AUTO_INCREMENT de tabela `utilizador`
+--
+ALTER TABLE `utilizador`
+  MODIFY `id_utilizador` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+
