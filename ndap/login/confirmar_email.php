@@ -40,9 +40,7 @@ function envia_email($destino, $nome) {
 
         if ($stmt->execute()) {
             // Cria o link de confirmação usando o token gerado
-            $link_confirmacao = "http://localhost/site_ndap/ndap/login/confirmar_conta
-            
-            .php?token=$token";
+            $link_confirmacao = "http://localhost/site_ndap/ndap/login/confirmar_conta.php?token=$token";
             $content = "<b>Clique no <a href='$link_confirmacao'>link</a> para confirmar o seu e-mail. Este link expira em 1 hora.</b>";
             $mail->Body = $content;
 

@@ -4,6 +4,6 @@ session_start();
 
 if (!isset($_SESSION['id']) || !$_SESSION['id']) {
 
-    die("Verificação de Segurança<a href=\"/site_ndap/ndap/ndap_teste.html\"><h1>Entrar</h1></a></p>");
+    die("Verificação de Segurança<a href=\"/site_ndap/ndap/ndap_site.php\"><h1>Entrar</h1></a></p>");
 }
 ?>

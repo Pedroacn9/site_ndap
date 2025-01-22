@@ -77,7 +77,7 @@ if (isset($_GET['token'])) {
 // Redireciona para o index.php após 5 segundos
 setTimeout(function() {
     window.location.href = "index.php";
-}, 3000);
+}, 0000);
 </script>
 </body>
 </html>

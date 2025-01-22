@@ -1,14 +1,13 @@
 <?php
-include('../login/conexao.php'); // Inclui o arquivo com a conexão
-
-// Verificar se a conexão foi estabelecida
-if (!$mysqli) {
-    die("Erro: A conexão com o banco de dados não foi inicializada.");
-}
+include('../login/conexao.php');
 
 // Obter todas as modalidades da tabela "modalidades"
 $sql_modalidades = "SELECT id_modalidades, tipo, preco FROM modalidades";
-$result_modalidades = $mysqli->query($sql_modalidades);
+$result_modalidades = $mysqli->query($sql_modalidades); // Ajustado para usar $mysqli
+
+if (!$result_modalidades) {
+    die("Erro ao buscar modalidades: " . $mysqli->error);
+}
 
 // Verifica se o formulário foi enviado
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -30,16 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $amount = $modalidade['preco'];
 
         // Busca o id_utilizador pelo e-mail informado
-        $sql_user = "SELECT id FROM utilizador WHERE email = ?";
-        $stmt_user = $mysqli->prepare($sql_user);
-        $stmt_user->bind_param('s', $email);
-        $stmt_user->execute();
-        $result_user = $stmt_user->get_result();
+        $sql_utilizador = "SELECT id_utilizador FROM utilizador WHERE email = ?";
+        $stmt_utilizador = $mysqli->prepare($sql_utilizador);
+        $stmt_utilizador->bind_param('s', $email);
+        $stmt_utilizador->execute();
+        $result_utilizador = $stmt_utilizador->get_result();
 
-        if ($result_user->num_rows > 0) {
+        if ($result_utilizador->num_rows > 0) {
             // O e-mail foi encontrado
-            $user_data = $result_user->fetch_assoc();
-            $id_utilizador = $user_data['id'];
+            $utilizador_data = $result_utilizador->fetch_assoc();
+            $id_utilizador = $utilizador_data['id_utilizador'];
 
             // Insere a nova quota no banco de dados
             $sql = "INSERT INTO quota (id_utilizador, amount, due_date, payment_method, transaction_id, payment_status) 
@@ -49,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('idsss', $id_utilizador, $amount, $due_date, $payment_method, $transaction_id);
 
             if ($stmt->execute()) {
-                $success_message = "Quota registrada com sucesso.";
+                $success_message = "Quota regist
+                ada com sucesso.";
             } else {
                 $error_message = "Erro ao registrar quota: " . $mysqli->error;
             }
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = "E-mail não encontrado na tabela de utilizadores.";
         }
 
-        $stmt_user->close();
+        $stmt_utilizador->close();
     } else {
         $error_message = "Modalidade inválida.";
     }
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="container">
         <h1>Registrar Pagamento de Quota</h1>
 
+        <!-- Exibe mensagens de sucesso ou erro -->
         <?php if (isset($success_message)): ?>
             <div class="success-message">
                 <?= $success_message; ?>
@@ -98,11 +99,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="email" id="email" name="email" required>
 
             <label for="id_modalidades">Modalidade:</label>
-            <select id="id_modalidades" name="tipos" onchange="updateAmount()" required>
+            <select id="id_modalidades" name="id_modalidades" onchange="updateAmount()" required>
                 <option value="">Selecione a modalidade</option>
-                <?php while ($modalidades = $result_modalidades->fetch_assoc()): ?>
+                <?php while ($modalidade = $result_modalidades->fetch_assoc()): ?>
                     <option value="<?= $modalidade['id_modalidades'] ?>" data-preco="<?= $modalidade['preco'] ?>">
-                        <?= $modalidade['tipo'] ?>  
+                        <?= $modalidade['tipo'] ?>
                     </option>
                 <?php endwhile; ?>
             </select>
@@ -120,10 +121,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <option value="mbway">MB WAY</option>
             </select>
 
-            <button type="submit">Registrar Quota</button>
+            <button type="submit">Registar Quota</button>
         </form>
     </div>
-          
+
     <script>
         function updateAmount() {
             const modalidadeSelect = document.getElementById('id_modalidades');
